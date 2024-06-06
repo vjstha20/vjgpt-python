@@ -1,0 +1,12 @@
+# Python cache files
+__pycache__/
+*.pyc
+
+# Environment variables file
+.env
+
+# VS Code settings
+.vscode/
+
+# Ignore all .mp3 files in the static folder
+/static/*.mp3

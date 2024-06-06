@@ -1,0 +1,236 @@
+<!-- Author: Vijay Shrestha
+     Date: 2024/06/01
+     Functionality: This file is the primary index.html and contains script for various functionality.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vjgpt</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+</head>
+<body>
+    <div class="container">
+        <h2>vjgpt</h2>
+        <div id="chat-container">
+            <!-- Conversation will be appended here -->
+        </div>
+        <!-- Form for user input and file upload -->
+        <form id="chat-form" enctype="multipart/form-data">
+            <input type="text" id="user-input" name="user_input" placeholder="Type your message..." required>
+            <input type="file" id="file-input" name="file" class="file-input">
+            <button type="submit">Send</button>
+            <button id="generate-image-btn" type="button">Generate Image</button>
+        </form>
+        <!-- Dropdowns for voice and language selection -->
+        <select id="voice-select">
+            <option value="alloy">Alloy</option>
+            <option value="echo">Echo</option>
+            <option value="fable">Fable</option>
+            <option value="onyx">Onyx</option>
+            <option value="nova">Nova</option>
+            <option value="shimmer">Shimmer</option>
+        </select>
+        <select id="language-select">
+            <option value="en">English</option>
+            <option value="fr">French</option>
+            <option value="hi">Hindi</option>
+            <option value="np">Nepali</option>
+            <option value="ru">Russian</option>
+            <option value="zh">Mandarin</option>
+            <option value="ja">Japanese</option>
+            <!-- Add more languages as needed -->
+        </select>
+        <button id="generate-speech-btn" type="button">Generate Speech</button>
+        <button id="download-btn">Download Conversation</button>
+        <button id="logout-btn">Logout</button>
+    </div>
+    <script>
+        // Author: Vijay Shrestha
+        // Date: 2024/06/01
+        // Functionality: This script handles the functionality for the chat, file upload, image generation, speech generation, downloading conversation, and logout actions.
+
+        // Logout button event listener
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            window.location.href = "{{ url_for('logout') }}";
+        });
+
+        // Form submission event listener
+        document.getElementById('chat-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(document.getElementById('chat-form'));
+
+            const chatContainer = document.getElementById('chat-container');
+            const userInput = formData.get('user_input');
+
+            // Append user message to chat container
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message user';
+            userMessage.textContent = userInput;
+            chatContainer.appendChild(userMessage);
+
+            // Send form data to the server and await response
+            const response = await fetch('/chat', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
+
+            const data = await response.json();
+
+            // Append API response to chat container
+            const apiMessage = document.createElement('div');
+            apiMessage.className = 'message api';
+            if (data.response.includes('```')) {
+                const codeSnippet = document.createElement('pre');
+                codeSnippet.className = 'code-snippet';
+                codeSnippet.textContent = data.response.replace(/```/g, '');
+                apiMessage.appendChild(codeSnippet);
+            } else {
+                apiMessage.textContent = data.response;
+            }
+            chatContainer.appendChild(apiMessage);
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;  // Auto-scroll to the latest message
+
+            document.getElementById('user-input').value = '';  // Clear input field
+            document.getElementById('file-input').value = '';  // Reset file input
+        });
+
+        // Download conversation button event listener
+        document.getElementById('download-btn').addEventListener('click', async function() {
+            const chatContainer = document.getElementById('chat-container');
+            const conversation = Array.from(chatContainer.children)
+                .map(node => node.textContent)
+                .join('\n');
+
+            // Send conversation data to the server to download as a file
+            const response = await fetch('/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                },
+                body: new URLSearchParams({ 'conversation': conversation })
+            });
+
+            const blob = await response.blob();
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = 'conversation.txt';
+            link.click();
+        });
+
+        // Add event listener for the generate image button
+        document.getElementById('generate-image-btn').addEventListener('click', async function() {
+            const userInput = document.getElementById('user-input').value;
+            if (!userInput) {
+                alert('Please enter a prompt for the image generation.');
+                return;
+            }
+
+            const chatContainer = document.getElementById('chat-container');
+
+            // Append user message to chat container
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message user';
+            userMessage.textContent = userInput;
+            chatContainer.appendChild(userMessage);
+
+            // Send image generation request to the server
+            const response = await fetch('/generate-image', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                },
+                body: JSON.stringify({ prompt: userInput })
+            });
+
+            const data = await response.json();
+
+            // Append generated image or error message to chat container
+            const apiMessage = document.createElement('div');
+            apiMessage.className = 'message api';
+            if (data.image_url) {
+                const image = document.createElement('img');
+                image.src = data.image_url;
+                image.alt = 'Generated Image';
+                apiMessage.appendChild(image);
+            } else {
+                apiMessage.textContent = 'Failed to generate image.';
+            }
+            chatContainer.appendChild(apiMessage);
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;  // Auto-scroll to the latest message
+
+            document.getElementById('user-input').value = '';  // Clear input field
+        });
+
+        // Add event listener for the generate speech button
+        document.getElementById('generate-speech-btn').addEventListener('click', async function() {
+            // Ensure the text is captured each time the button is clicked
+            const userInput = document.getElementById('user-input').value;
+            console.log("User Input for Speech:", userInput); // Debugging statement
+            if (!userInput) {
+                alert('Please enter text for speech generation.');
+                return;
+            }
+
+            const voice = document.getElementById('voice-select').value;
+            const language = document.getElementById('language-select').value;
+
+            const chatContainer = document.getElementById('chat-container');
+
+            // Append user message to chat container
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message user';
+            userMessage.textContent = userInput;
+            chatContainer.appendChild(userMessage);
+
+            // Send speech generation request to the server
+            const response = await fetch('/generate-speech', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                },
+                body: JSON.stringify({ text: userInput, voice: voice, language: language })
+            });
+
+            const data = await response.json();
+
+            console.log("API Response for Speech:", data); // Debugging statement
+
+            // Append generated audio or error message to chat container
+            const apiMessage = document.createElement('div');
+            apiMessage.className = 'message api';
+            if (data.audio_url) {
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = data.audio_url;
+                apiMessage.appendChild(audio);
+            } else {
+                apiMessage.textContent = 'Failed to generate speech.';
+            }
+            chatContainer.appendChild(apiMessage);
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;  // Auto-scroll to the latest message
+
+            document.getElementById('user-input').value = '';  // Clear input field
+        });
+    </script>
+</body>
+</html>
